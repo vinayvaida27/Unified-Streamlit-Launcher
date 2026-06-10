@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from launcher.app_discovery import discover_apps
+from launcher.models import EnvironmentState
+from launcher.process_manager import ProcessManager
+
+
+class FakeProcess:
+    pid = 1234
+
+    def __init__(self):
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return None if not self.terminated else 0
+
+    def terminate(self):
+        self.terminated = True
+
+    def kill(self):
+        self.killed = True
+        self.terminated = True
+
+    def wait(self, timeout=None):
+        return 0
+
+
+class FakeHealth:
+    def wait_until_healthy(self, process, port, timeout_seconds, log_path=None):
+        return f"http://127.0.0.1:{port}"
+
+
+def _env(tmp_path: Path):
+    return EnvironmentState("hello-pipeline", "1.0.0", tmp_path / "env", tmp_path / "env" / "Scripts" / "python.exe", True, tmp_path / "marker")
+
+
+def test_builds_correct_command_list(repo_root, tmp_path):
+    app = discover_apps(repo_root / "apps")[0]
+    manager = ProcessManager(tmp_path, health_checker=FakeHealth())
+    command = manager.build_command(app, _env(tmp_path), 5555)
+    assert command[1:4] == ["-m", "streamlit", "run"]
+    assert "--server.address" in command
+    assert "127.0.0.1" in command
+    assert "--server.port" in command
+    assert "5555" in command
+
+
+def test_records_process_state(monkeypatch, repo_root, tmp_path):
+    app = discover_apps(repo_root / "apps")[0]
+    monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: FakeProcess())
+    manager = ProcessManager(tmp_path, health_checker=FakeHealth())
+    state = manager.start(app, _env(tmp_path))
+    assert state.process_id == 1234
+    assert state.url.startswith("http://127.0.0.1:")
+
+
+def test_does_not_start_duplicate_app(monkeypatch, repo_root, tmp_path):
+    app = discover_apps(repo_root / "apps")[0]
+    calls = []
+
+    def popen(*args, **kwargs):
+        calls.append(args)
+        return FakeProcess()
+
+    monkeypatch.setattr("subprocess.Popen", popen)
+    manager = ProcessManager(tmp_path, health_checker=FakeHealth())
+    first = manager.start(app, _env(tmp_path))
+    second = manager.start(app, _env(tmp_path))
+    assert first is second
+    assert len(calls) == 1
+
+
+def test_stops_process(monkeypatch, repo_root, tmp_path):
+    app = discover_apps(repo_root / "apps")[0]
+    fake = FakeProcess()
+    monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: fake)
+    manager = ProcessManager(tmp_path, health_checker=FakeHealth())
+    manager.start(app, _env(tmp_path))
+    manager.stop(app.id)
+    assert fake.terminated
+    assert manager.get(app.id) is None
+
+
+def test_cleans_state_after_crash(monkeypatch, repo_root, tmp_path):
+    app = discover_apps(repo_root / "apps")[0]
+    fake = FakeProcess()
+    monkeypatch.setattr("subprocess.Popen", lambda *args, **kwargs: fake)
+    manager = ProcessManager(tmp_path, health_checker=FakeHealth())
+    manager.start(app, _env(tmp_path))
+    fake.terminated = True
+    assert manager.get(app.id) is None

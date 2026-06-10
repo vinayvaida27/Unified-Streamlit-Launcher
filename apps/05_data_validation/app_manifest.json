@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "data-validation-pipeline",
+  "name": "Data Validation Pipeline",
+  "version": "1.0.0",
+  "description": "A minimal Streamlit application for a data validation pipeline.",
+  "category": "Data Engineering",
+  "type": "streamlit",
+  "entrypoint": "app.py",
+  "icon": "assets/icon.svg",
+  "requirements": "requirements.txt",
+  "wheelhouse": "wheelhouse",
+  "python_version": "3.11",
+  "enabled": true,
+  "display_order": 5,
+  "launch": {"address": "127.0.0.1", "port": "dynamic", "headless": true, "file_watcher_type": "none", "gather_usage_stats": false, "startup_timeout_seconds": 60}
+}

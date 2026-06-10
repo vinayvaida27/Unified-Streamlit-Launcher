@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+dist/
+build/release/
+build/pyinstaller/
+*.spec
+logs/
+state/
+staging/
+runtime/*
+!runtime/README.md
+!runtime/.gitkeep
+*.log
