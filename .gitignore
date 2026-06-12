@@ -3,10 +3,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.autoresearch/evidence/
 .mypy_cache/
 dist/
 build/Unified-Streamlit-Launcher/
 build/pyinstaller/
+build/pyinstaller-work/
 *.spec
 logs/
 state/

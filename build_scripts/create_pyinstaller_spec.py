@@ -5,6 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def _valid_windows_icon(icon_path: Path) -> bool:
+    """Return True only when PyInstaller can safely receive the ICO path."""
+
+    if not icon_path.exists() or icon_path.suffix.lower() != ".ico":
+        return False
+    try:
+        return icon_path.read_bytes()[:4] == b"\x00\x00\x01\x00"
+    except OSError:
+        return False
+
+
 def generate_spec(project_root: Path | None = None) -> Path:
     """Write and return the launcher spec path."""
 
@@ -12,8 +23,13 @@ def generate_spec(project_root: Path | None = None) -> Path:
     spec_path = root / "build" / "launcher.spec"
     entrypoint = (root / "launcher" / "__main__.py").as_posix()
     pathex = root.as_posix()
-    icon_path = (root / "assets" / "launcher" / "launcher.ico").as_posix()
-    icon_line = f"    icon=r'{icon_path}'," if Path(icon_path).exists() else "    icon=None,"
+    icon_path = root / "assets" / "launcher" / "launcher.ico"
+    if _valid_windows_icon(icon_path):
+        icon_line = f"    icon=r'{icon_path.as_posix()}',"
+    else:
+        if icon_path.exists():
+            print(f"Warning: ignoring invalid launcher icon: {icon_path}")
+        icon_line = "    icon=None,"
 
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(

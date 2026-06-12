@@ -7,6 +7,9 @@ if (!(Test-Path $Python)) { throw "Run scripts/setup_dev.ps1 first." }
 
 Write-Host "Building Unified Streamlit Launcher EXE release..."
 & $Python (Join-Path $Root "build_scripts\build.py")
+if ($LASTEXITCODE -ne 0) {
+  exit $LASTEXITCODE
+}
 
 Write-Host ""
 Write-Host "Done. Release folder:"
