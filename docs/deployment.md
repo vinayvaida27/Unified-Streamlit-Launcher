@@ -13,6 +13,35 @@ Unified-Streamlit-Launcher/
 
 Users run `launcher.exe`. They do not install Python.
 
+## Network Drive Deployment
+
+The release folder can live on a network drive, for example:
+
+```text
+\\server\shared\Unified-Streamlit-Launcher\
+  launcher.exe
+  apps/
+  config/
+  runtime/
+```
+
+Users who have access to the share can double-click `launcher.exe`.
+
+On startup, the launcher:
+
+1. reads `apps/apps.json` from the release folder;
+2. copies each registered app folder into the user's local cache;
+3. creates or reuses per-app virtual environments under the local cache;
+4. runs Streamlit from local cached app source, not directly from the network app folder.
+
+Default local cache:
+
+```text
+%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform
+```
+
+This keeps the shared network folder as the distribution source while avoiding slow or fragile Python execution from the network drive.
+
 ## Distribution Options
 
 - Copy the folder to a local machine.
@@ -23,11 +52,11 @@ Users run `launcher.exe`. They do not install Python.
 
 Apps are not sealed inside `launcher.exe`.
 
-To add an app after a build:
+To add an app after a build on the network share:
 
-1. Copy a new app folder into `apps/`.
-2. Add the app to `apps/apps.json`.
-3. Restart `launcher.exe`.
+1. Copy a new app folder into `\\server\shared\Unified-Streamlit-Launcher\apps\`.
+2. Add the app to `\\server\shared\Unified-Streamlit-Launcher\apps\apps.json`.
+3. Ask users to restart `launcher.exe`.
 
 The launcher will create or reuse that app's per-user virtual environment when the app is opened.
 

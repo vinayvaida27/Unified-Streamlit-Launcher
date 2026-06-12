@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     cache = LocalCacheManager(config.paths.local_cache_directory)
     cache.ensure_directories()
     configure_logging(config.paths.local_cache_directory, config.logging)
-    apps = discover_apps(config.paths.apps_directory)
+    apps = cache.sync_apps_to_local_cache(discover_apps(config.paths.apps_directory))
     runtime_python = RuntimeResolver(config, development_mode=args.development).resolve()
     env_manager = EnvironmentManager(config, runtime_python)
     process_manager = ProcessManager(cache.logs_dir)

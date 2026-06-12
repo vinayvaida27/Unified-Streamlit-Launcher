@@ -6,6 +6,7 @@ flowchart LR
     GUI --> Discovery["App Discovery"]
     GUI --> Env["Environment Manager"]
     GUI --> PM["Process Manager"]
+    Discovery --> Cache["Local App Cache"]
     Env --> Cache["Local Cache"]
     PM --> Streamlit["Streamlit on 127.0.0.1"]
     Streamlit --> Browser["Default Browser"]

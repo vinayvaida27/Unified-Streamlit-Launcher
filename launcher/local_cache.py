@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import shutil
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .constants import STATE_SCHEMA_VERSION
+from .models import ApplicationManifest
 from .path_utils import atomic_write_json, read_json
 
 
@@ -15,6 +19,7 @@ class LocalCacheManager:
     def __init__(self, base_dir: Path) -> None:
         self.base_dir = base_dir
         self.environments_dir = base_dir / "environments"
+        self.apps_dir = base_dir / "apps"
         self.logs_dir = base_dir / "logs"
         self.state_dir = base_dir / "state"
         self.staging_dir = base_dir / "staging"
@@ -22,8 +27,44 @@ class LocalCacheManager:
     def ensure_directories(self) -> None:
         """Create expected local cache directories."""
 
-        for path in (self.base_dir, self.environments_dir, self.logs_dir, self.state_dir, self.staging_dir):
+        for path in (self.base_dir, self.apps_dir, self.environments_dir, self.logs_dir, self.state_dir, self.staging_dir):
             path.mkdir(parents=True, exist_ok=True)
+
+    def sync_apps_to_local_cache(self, apps: list[ApplicationManifest]) -> list[ApplicationManifest]:
+        """Copy app source folders into the per-user local cache.
+
+        This lets a published launcher live on a network drive while Streamlit
+        source code executes from local disk for reliability and speed.
+        """
+
+        return [self.sync_app_to_local_cache(app) for app in apps]
+
+    def sync_app_to_local_cache(self, app: ApplicationManifest) -> ApplicationManifest:
+        """Copy one app to the local cache and return a manifest pointing there."""
+
+        source_fingerprint = self._fingerprint_directory(app.app_dir)
+        cached_app_dir = self.apps_dir / app.id / app.version
+        marker_path = cached_app_dir / ".app_cache_ready.json"
+        if not self._cache_marker_matches(marker_path, source_fingerprint):
+            cached_app_dir.parent.mkdir(parents=True, exist_ok=True)
+            temp_dir = cached_app_dir.parent / f".{cached_app_dir.name}.staging"
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+            if cached_app_dir.exists():
+                shutil.rmtree(cached_app_dir)
+            shutil.copytree(app.app_dir, temp_dir, ignore=self._copy_ignore)
+            temp_dir.replace(cached_app_dir)
+            atomic_write_json(
+                marker_path,
+                {
+                    "app_id": app.id,
+                    "app_version": app.version,
+                    "source_path": str(app.app_dir),
+                    "source_fingerprint": source_fingerprint,
+                    "cached_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        return self._with_cached_paths(app, cached_app_dir)
 
     @property
     def state_path(self) -> Path:
@@ -47,3 +88,46 @@ class LocalCacheManager:
         if last_exit_code is not None:
             entry["last_exit_code"] = last_exit_code
         atomic_write_json(self.state_path, state)
+
+    @staticmethod
+    def _copy_ignore(directory: str, names: list[str]) -> set[str]:
+        ignored = {"__pycache__", ".pytest_cache", ".mypy_cache", ".streamlit"}
+        return {name for name in names if name in ignored or name.endswith((".pyc", ".pyo", ".log"))}
+
+    @staticmethod
+    def _cache_marker_matches(marker_path: Path, fingerprint: str) -> bool:
+        if not marker_path.exists():
+            return False
+        try:
+            marker = read_json(marker_path)
+        except (OSError, ValueError):
+            return False
+        return marker.get("source_fingerprint") == fingerprint
+
+    @staticmethod
+    def _fingerprint_directory(directory: Path) -> str:
+        digest = hashlib.sha256()
+        for path in sorted(directory.rglob("*")):
+            if not path.is_file() or path.name == ".app_cache_ready.json":
+                continue
+            if any(part in {"__pycache__", ".pytest_cache", ".mypy_cache", ".streamlit"} for part in path.parts):
+                continue
+            relative = path.relative_to(directory).as_posix()
+            digest.update(relative.encode("utf-8"))
+            digest.update(path.read_bytes())
+        return digest.hexdigest()
+
+    @staticmethod
+    def _with_cached_paths(app: ApplicationManifest, cached_app_dir: Path) -> ApplicationManifest:
+        entrypoint_relative = app.entrypoint.relative_to(app.app_dir)
+        icon_relative = app.icon.relative_to(app.app_dir)
+        requirements_relative = app.requirements.relative_to(app.app_dir)
+        wheelhouse_relative = app.wheelhouse.relative_to(app.app_dir)
+        return replace(
+            app,
+            app_dir=cached_app_dir.resolve(),
+            entrypoint=(cached_app_dir / entrypoint_relative).resolve(),
+            icon=(cached_app_dir / icon_relative).resolve(),
+            requirements=(cached_app_dir / requirements_relative).resolve(),
+            wheelhouse=(cached_app_dir / wheelhouse_relative).resolve(),
+        )
