@@ -20,7 +20,13 @@
     "allow_development_interpreter_fallback": true,
     "create_virtual_environments": true,
     "environment_strategy": "per_app_per_version",
-    "offline_install_preferred": true
+    "offline_install_preferred": true,
+    "download": {
+      "enabled": false,
+      "version": "3.11.9",
+      "url": "https://globalcdn.nuget.org/packages/python.3.11.9.nupkg",
+      "sha256": ""
+    }
   },
   "updates": {
     "enabled": false,

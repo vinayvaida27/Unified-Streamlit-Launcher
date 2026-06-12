@@ -1,86 +1,108 @@
-# Deployment
+# Deployment Guide
 
-The recommended deployment is a portable folder:
+Goal: ship one folder that contains `launcher.exe` **and** a private Python
+runtime, so non-technical users just double-click `launcher.exe` and never
+install Python.
 
-```text
-Unified-Streamlit-Launcher/
-  launcher.exe
-  apps/
-  config/
-  runtime/
-  docs/
+## Why a bundled runtime
+
+The launcher runs every Streamlit app on its **own** Python. The release must
+therefore carry a complete, relocatable CPython in `runtime/`.
+
+Important: the python.org "embeddable ZIP" will **NOT** work -- it has no `pip`
+and no `venv`. Use a full, relocatable build. The official **NuGet `python`
+package** is the easiest correct source.
+
+## Step 1 - Install Python into `runtime/`
+
+From the project root in PowerShell:
+
+```powershell
+.\scripts\fetch_runtime.ps1
+# or pin a specific version:
+.\scripts\fetch_runtime.ps1 -Version 3.12.7
 ```
 
-Users run `launcher.exe`. They do not install Python.
-
-## Network Drive Deployment
-
-The release folder can live on a network drive, for example:
+This downloads the official CPython NuGet package, copies it into `runtime/`,
+bootstraps pip, and validates `venv` + `pip` + `ssl`. Afterwards you have:
 
 ```text
-\\server\shared\Unified-Streamlit-Launcher\
-  launcher.exe
-  apps/
-  config/
-  runtime/
+runtime/
+  python.exe
+  Lib/
+  DLLs/
+  runtime_info.json
 ```
 
-Users who have access to the share can double-click `launcher.exe`.
+If your organization provides its own approved extracted runtime, use
+`.\scripts\prepare_runtime.ps1 -RuntimeSource C:\path\to\extracted-python`
+instead.
 
-On startup, the launcher:
-
-1. reads `apps/apps.json` from the release folder;
-2. copies the bundled `runtime/` folder into the user's local cache;
-3. copies each registered app folder into the user's local cache;
-4. creates or reuses per-app virtual environments under the local cache;
-5. runs Streamlit from local cached runtime and app source, not directly from the network app folder.
-
-Default local cache:
-
-```text
-%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform
-```
-
-This keeps the shared network folder as the distribution source while avoiding slow or fragile Python execution from the network drive. Fifteen users can open the same shared `launcher.exe`; each user gets separate local runtime, app, environment, log, and state folders.
-
-## Distribution Options
-
-- Copy the folder to a local machine.
-- Publish the folder to a read-only network share.
-- Wrap the folder with an installer later using `build_scripts/installer.nsis`.
-
-## Updating Apps After Build
-
-Apps are not sealed inside `launcher.exe`.
-
-To add an app after a build on the network share:
-
-1. Copy a new app folder into `\\server\shared\Unified-Streamlit-Launcher\apps\`.
-2. Add the app to `\\server\shared\Unified-Streamlit-Launcher\apps\apps.json`.
-3. Ask users to restart `launcher.exe`.
-
-The launcher will create or reuse that app's per-user virtual environment when the app is opened.
-
-## Production Runtime
-
-Production releases should include a complete portable Python runtime under `runtime/`.
-
-The runtime must support:
-
-- `python.exe`
-- `venv`
-- `pip`
-- SSL
-- subprocesses
-
-The CPython embeddable ZIP is not enough unless customized to support `venv` and `pip`.
-
-## Build Pipeline
-
-The release folder is produced by:
+## Step 2 - Build the release folder
 
 ```powershell
 .\scripts\build_exe.ps1
 ```
 
-Internally this calls `build_scripts/build.py`, which generates a PyInstaller spec, builds `launcher.exe`, copies external app/config/runtime folders, writes checksums, and verifies the release structure.
+This runs the tests, builds `launcher.exe` with PyInstaller, copies
+`apps/`, `config/`, `assets/`, `docs/`, and `runtime/` next to it, and writes
+checksums. Output:
+
+```text
+build/Unified-Streamlit-Launcher/
+  launcher.exe
+  runtime/python.exe
+  apps/
+  config/
+  assets/
+  docs/
+  checksums.sha256
+```
+
+## Step 3 - Distribute
+
+Pick one:
+
+**A. Copy the folder.** Give users the whole
+`build/Unified-Streamlit-Launcher/` folder (USB, zip, or network share). They
+double-click `launcher.exe`.
+
+**B. Network share.** Put the folder on `\\server\share\...`, make it
+read-only for users. Many users run the same `launcher.exe`; each gets a
+private local cache, runtime copy, and venvs under
+`%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform\`.
+
+**C. One-click installer.** Build the NSIS installer
+(`build_scripts/installer.nsis`) for a single Setup.exe. Code-signing is
+recommended before wide distribution.
+
+## Alternative - no bundled runtime (auto-download)
+
+If you would rather not bundle Python in the folder, enable the download
+fallback instead. The launcher will fetch a pinned official CPython into each
+user's cache on first run (needs internet on first launch, no admin rights):
+
+```powershell
+.\scripts\pin_runtime_download.ps1            # downloads once, pins the SHA-256
+.\scripts\build_exe.ps1
+```
+
+This sets `runtime.download.enabled = true` in `config/launcher_config.json`.
+Bundling (Steps 1-2) is still preferred for offline and air-gapped sites.
+
+## What the end user does
+
+1. Open the folder (or run the installer).
+2. Double-click `launcher.exe`.
+3. Click **Open** on an app. First launch builds that app's environment
+   (one-time, slower); later launches are instant.
+
+No Python install, no PowerShell, no admin rights. A Python already installed
+on the machine is never used.
+
+## Verify the "never use system Python" guarantee
+
+On a test machine that **has** Python installed, open an app, then in Task
+Manager / Process Explorer confirm every `python.exe` path is under
+`%LOCALAPPDATA%\...\UnifiedStreamlitPlatform\` -- never `C:\PythonXX` or the
+Microsoft Store path.

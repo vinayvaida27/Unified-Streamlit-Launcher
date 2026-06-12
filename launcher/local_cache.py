@@ -165,6 +165,11 @@ class LocalCacheManager:
             digest.update(path.read_bytes())
         return digest.hexdigest()
 
+    # Files at or below this size are content-hashed so that a same-size edit
+    # made within the filesystem mtime resolution is still detected. Larger
+    # files (big DLLs) fall back to size + mtime to keep startup fast.
+    _CONTENT_HASH_MAX_BYTES = 8 * 1024 * 1024
+
     @staticmethod
     def _fingerprint_directory_metadata(directory: Path) -> str:
         digest = hashlib.sha256()
@@ -178,6 +183,8 @@ class LocalCacheManager:
             digest.update(relative.encode("utf-8"))
             digest.update(str(stat.st_size).encode("ascii"))
             digest.update(str(stat.st_mtime_ns).encode("ascii"))
+            if stat.st_size <= LocalCacheManager._CONTENT_HASH_MAX_BYTES:
+                digest.update(path.read_bytes())
         return digest.hexdigest()
 
     @staticmethod

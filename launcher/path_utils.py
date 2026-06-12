@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -11,10 +12,21 @@ from typing import Any
 from .exceptions import SecurityValidationError
 
 
+def _expand_windows_vars(value: str) -> str:
+    """Expand %VAR% style variables on any platform (ntpath does not on POSIX)."""
+
+    def _replace(match: "re.Match[str]") -> str:
+        name = match.group(1)
+        return os.environ.get(name, match.group(0))
+
+    return re.sub(r"%([^%]+)%", _replace, value)
+
+
 def expand_path(value: str, base_dir: Path | None = None) -> Path:
     """Expand environment variables and return an absolute path."""
 
     expanded = os.path.expandvars(os.path.expanduser(value))
+    expanded = _expand_windows_vars(expanded)
     path = Path(expanded)
     if not path.is_absolute() and base_dir is not None:
         path = base_dir / path

@@ -50,13 +50,29 @@ class RuntimeResolver:
             raise RuntimeValidationError(f"Unsupported Python version: {result.stdout.strip()}")
 
 
+def scrubbed_environment() -> dict[str, str]:
+    """Return a child-process environment without system-Python contamination."""
+
+    import os
+
+    env = os.environ.copy()
+    for variable in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONUSERBASE"):
+        env.pop(variable, None)
+    env["PYTHONNOUSERSITE"] = "1"
+    return env
+
+
 class EnvironmentManager:
     """Creates and validates per-app/per-version virtual environments."""
+
+    VENV_TIMEOUT_SECONDS = 300
+    PIP_TIMEOUT_SECONDS = 1800
 
     def __init__(self, config: PlatformConfig, runtime_python: Path) -> None:
         self.config = config
         self.runtime_python = runtime_python
         self.environments_dir = config.paths.local_cache_directory / "environments"
+        self.logs_dir = config.paths.local_cache_directory / "logs"
 
     def environment_path_for(self, app: ApplicationManifest) -> Path:
         """Return deterministic environment path for an app version."""
@@ -80,6 +96,15 @@ class EnvironmentManager:
         digest.update(requirements_path.read_bytes())
         return digest.hexdigest()
 
+    def runtime_fingerprint(self) -> str:
+        """Identify the runtime build so venvs rebuild after runtime updates."""
+
+        try:
+            stat = self.runtime_python.stat()
+            return f"{self.runtime_python.resolve().as_posix()}|{stat.st_size}|{stat.st_mtime_ns}"
+        except OSError:
+            return str(self.runtime_python)
+
     def is_ready(self, app: ApplicationManifest) -> bool:
         """Return whether an environment marker matches current inputs."""
 
@@ -96,6 +121,7 @@ class EnvironmentManager:
             data.get("app_id") == app.id
             and data.get("app_version") == app.version
             and data.get("requirements_sha256") == self.requirements_hash(app.requirements)
+            and data.get("runtime_fingerprint") == self.runtime_fingerprint()
         )
 
     def pip_install_command(self, app: ApplicationManifest, venv_python: Path) -> list[str]:
@@ -107,41 +133,28 @@ class EnvironmentManager:
         command.extend(["-r", str(app.requirements)])
         return command
 
+    def _run_logged(self, command: list[str], log_handle, timeout_seconds: int, failure_message: str, error_cls) -> None:
+        """Run a command streaming output to the app log, with a timeout."""
+
+        log_handle.write(f"\n{datetime.now(timezone.utc).isoformat()} Running: {' '.join(command)}\n")
+        log_handle.flush()
+        try:
+            result = subprocess.run(
+                command,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                env=scrubbed_environment(),
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise error_cls(f"{failure_message}: timed out after {timeout_seconds} seconds") from exc
+        if result.returncode != 0:
+            raise error_cls(f"{failure_message} (exit code {result.returncode}). Open the application log for details.")
+
     def ensure_environment(self, app: ApplicationManifest, progress=None) -> EnvironmentState:
         """Create or reuse an app environment."""
 
         env_path = self.environment_path_for(app)
         venv_python = self.venv_python_for(env_path)
-        marker_path = self.marker_path_for(env_path)
-        if progress:
-            progress("Checking environment")
-        if self.is_ready(app):
-            return EnvironmentState(app.id, app.version, env_path, venv_python, True, marker_path)
-        env_path.parent.mkdir(parents=True, exist_ok=True)
-        if progress:
-            progress("Creating virtual environment")
-        result = subprocess.run([str(self.runtime_python), "-m", "venv", str(env_path)], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise EnvironmentCreationError(result.stderr.strip() or "Virtual environment creation failed")
-        if progress:
-            progress("Installing dependencies")
-        pip_cmd = self.pip_install_command(app, venv_python)
-        result = subprocess.run(pip_cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise DependencyInstallationError(result.stderr.strip() or "Dependency installation failed")
-        if progress:
-            progress("Validating environment")
-        result = subprocess.run([str(venv_python), "-c", "import streamlit"], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise DependencyInstallationError(result.stderr.strip() or "Streamlit validation import failed")
-        atomic_write_json(
-            marker_path,
-            {
-                "app_id": app.id,
-                "app_version": app.version,
-                "python_version": subprocess.check_output([str(venv_python), "--version"], text=True).strip(),
-                "requirements_sha256": self.requirements_hash(app.requirements),
-                "installed_at": datetime.now(timezone.utc).isoformat(),
-            },
-        )
-        return EnvironmentState(app.id, app.version, env_path, venv_python, True, marker_path)
+        marker_pat

@@ -1,7 +1,28 @@
 from __future__ import annotations
 
+import json
+
 from launcher.app_discovery import discover_apps
 from launcher.environment_manager import EnvironmentManager, RuntimeResolver
+
+
+def _seed_marker(manager, app, marker_overrides=None):
+    """Create the venv python stub and write a marker, returning the env path."""
+
+    env_path = manager.environment_path_for(app)
+    python_path = manager.venv_python_for(env_path)
+    python_path.parent.mkdir(parents=True, exist_ok=True)
+    python_path.write_text("", encoding="utf-8")
+    marker = {
+        "app_id": app.id,
+        "app_version": app.version,
+        "requirements_sha256": manager.requirements_hash(app.requirements),
+        "runtime_fingerprint": manager.runtime_fingerprint(),
+    }
+    if marker_overrides:
+        marker.update(marker_overrides)
+    manager.marker_path_for(env_path).write_text(json.dumps(marker), encoding="utf-8")
+    return env_path
 
 
 def test_calculates_deterministic_environment_path(temp_config, repo_root):
@@ -13,29 +34,21 @@ def test_calculates_deterministic_environment_path(temp_config, repo_root):
 def test_detects_ready_marker(temp_config, repo_root):
     app = discover_apps(repo_root / "apps")[0]
     manager = EnvironmentManager(temp_config, repo_root / "fake-python.exe")
-    env_path = manager.environment_path_for(app)
-    python_path = manager.venv_python_for(env_path)
-    python_path.parent.mkdir(parents=True, exist_ok=True)
-    python_path.write_text("", encoding="utf-8")
-    marker = manager.marker_path_for(env_path)
-    marker.write_text(
-        '{"app_id":"hello-pipeline","app_version":"1.0.0","requirements_sha256":"' + manager.requirements_hash(app.requirements) + '"}',
-        encoding="utf-8",
-    )
+    _seed_marker(manager, app)
     assert manager.is_ready(app)
 
 
-def test_detects_changed_requirements_hash(temp_config, repo_root, tmp_path):
+def test_detects_changed_runtime_fingerprint(temp_config, repo_root):
     app = discover_apps(repo_root / "apps")[0]
     manager = EnvironmentManager(temp_config, repo_root / "fake-python.exe")
-    env_path = manager.environment_path_for(app)
-    python_path = manager.venv_python_for(env_path)
-    python_path.parent.mkdir(parents=True, exist_ok=True)
-    python_path.write_text("", encoding="utf-8")
-    manager.marker_path_for(env_path).write_text(
-        '{"app_id":"hello-pipeline","app_version":"1.0.0","requirements_sha256":"wrong"}',
-        encoding="utf-8",
-    )
+    _seed_marker(manager, app, {"runtime_fingerprint": "stale-runtime"})
+    assert not manager.is_ready(app)
+
+
+def test_detects_changed_requirements_hash(temp_config, repo_root):
+    app = discover_apps(repo_root / "apps")[0]
+    manager = EnvironmentManager(temp_config, repo_root / "fake-python.exe")
+    _seed_marker(manager, app, {"requirements_sha256": "wrong"})
     assert not manager.is_ready(app)
 
 

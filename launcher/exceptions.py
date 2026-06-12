@@ -21,6 +21,10 @@ class RuntimeValidationError(LauncherError):
     """Raised when a Python runtime cannot satisfy launcher requirements."""
 
 
+class RuntimeDownloadError(LauncherError):
+    """Raised when the pinned official Python runtime cannot be downloaded."""
+
+
 class EnvironmentCreationError(LauncherError):
     """Raised when a virtual environment cannot be created."""
 

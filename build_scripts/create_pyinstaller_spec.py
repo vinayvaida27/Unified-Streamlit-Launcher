@@ -21,7 +21,7 @@ def generate_spec(project_root: Path | None = None) -> Path:
 
     root = (project_root or Path(__file__).resolve().parent.parent).resolve()
     spec_path = root / "build" / "launcher.spec"
-    entrypoint = (root / "launcher" / "__main__.py").as_posix()
+    entrypoint = (root / "build_scripts" / "launcher_entry.py").as_posix()
     pathex = root.as_posix()
     icon_path = root / "assets" / "launcher" / "launcher.ico"
     if _valid_windows_icon(icon_path):

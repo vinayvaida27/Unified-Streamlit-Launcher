@@ -12,6 +12,7 @@ from .models import (
     PathConfig,
     PlatformConfig,
     RuntimeConfig,
+    RuntimeDownloadConfig,
     UpdateConfig,
     WindowConfig,
 )
@@ -67,6 +68,12 @@ def load_platform_config(config_path: Path) -> PlatformConfig:
             create_virtual_environments=bool(_require(runtime, "create_virtual_environments")),
             environment_strategy=str(_require(runtime, "environment_strategy")),
             offline_install_preferred=bool(_require(runtime, "offline_install_preferred")),
+            download=RuntimeDownloadConfig(
+                enabled=bool(runtime.get("download", {}).get("enabled", False)),
+                version=str(runtime.get("download", {}).get("version", "")),
+                url=str(runtime.get("download", {}).get("url", "")),
+                sha256=str(runtime.get("download", {}).get("sha256", "")),
+            ),
         ),
         updates=UpdateConfig(
             enabled=bool(_require(updates, "enabled")),

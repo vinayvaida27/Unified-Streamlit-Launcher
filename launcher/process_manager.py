@@ -60,9 +60,11 @@ class ProcessManager:
             command = self.build_command(app, env, port)
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
             env_vars = os.environ.copy()
+            for variable in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONUSERBASE"):
+                env_vars.pop(variable, None)
             env_vars["PYTHONNOUSERSITE"] = "1"
             try:
-                log_handle = log_path.open("w", encoding="utf-8")
+                log_handle = log_path.open("a", encoding="utf-8")
                 log_handle.write(f"{datetime.now(timezone.utc).isoformat()} Launcher starting {app.name} {app.version}\n")
                 log_handle.write(f"Command: {' '.join(command)}\n\n")
                 log_handle.flush()

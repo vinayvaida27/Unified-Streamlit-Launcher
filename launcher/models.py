@@ -39,11 +39,22 @@ class PathConfig:
 
 
 @dataclass(frozen=True)
+class RuntimeDownloadConfig:
+    """Pinned official CPython download used when no runtime is bundled."""
+
+    enabled: bool = False
+    version: str = ""
+    url: str = ""
+    sha256: str = ""
+
+
+@dataclass(frozen=True)
 class RuntimeConfig:
     allow_development_interpreter_fallback: bool
     create_virtual_environments: bool
     environment_strategy: str
     offline_install_preferred: bool
+    download: RuntimeDownloadConfig = field(default_factory=RuntimeDownloadConfig)
 
 
 @dataclass(frozen=True)
