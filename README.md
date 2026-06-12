@@ -1,68 +1,104 @@
 # Unified Streamlit Launcher
 
-Production-oriented Windows desktop launcher for multiple Python/Streamlit applications.
+Windows desktop launcher for many independent Streamlit apps.
 
-![Screenshot placeholder](assets/launcher/launcher.png)
+The important idea is simple:
 
-The launcher is a PySide6 desktop wrapper and process manager. It reads one simple registry file, `apps/apps.json`, prepares isolated virtual environments in a per-user local cache, starts Streamlit on dynamic `127.0.0.1` ports, waits for readiness, then opens the default browser.
+- `launcher/` is the reusable desktop framework.
+- `apps/` contains Streamlit applications.
+- `apps/apps.json` is the only app registry people normally edit.
+- `build/Unified-Streamlit-Launcher/` is the generated folder you give to users.
 
-## Simple Project Layout
+Nontechnical users should run the built `launcher.exe`. They should not install Python, run PowerShell, or edit launcher code.
+
+## Repository Layout
 
 ```text
 Unified-Streamlit-Launcher/
-  apps/
-    apps.json                  # one place to register apps
-    01_hello_pipeline/         # one self-contained Streamlit app
-      app.py
-      requirements.txt
-      README.md
-      assets/icon.svg
-  launcher/                    # desktop launcher framework
-  build/                       # generated builds/releases go here
-  scripts/
-  documentation/
+  launcher/                 # Core PySide6 launcher framework
+  apps/                     # Streamlit apps and central registry
+    apps.json
+    app_template/
+    01_hello_pipeline/
+    02_second_app/
+  config/                   # Global launcher config
+    launcher_config.json
+    platform_manifest.json
+  runtime/                  # Portable Python runtime for production builds
+  scripts/                  # Setup/build/release scripts
+  build/                    # Generated releases
+  docs/                     # User and deployment documentation
+  tests/
 ```
 
-New people only need to understand:
+## Developer Quickstart
 
-- Put Streamlit apps in `apps/<app_folder>/`.
-- Register each app in `apps/apps.json`.
-- Run the launcher in development mode or build a release into `build/`.
-
-## Development Setup
+Use Windows PowerShell:
 
 ```powershell
 .\scripts\setup_dev.ps1
 .\scripts\run_launcher_dev.ps1
 ```
 
-Development mode may fall back to the current Python interpreter when `runtime/python.exe` is not present. Production releases must include a validated portable runtime.
+Development requires Python 3.11 or 3.12. The dev launcher can use the local interpreter while production builds use `runtime/python.exe`.
 
-## Build Release
+## Build The EXE Release
+
+1. Prepare or copy an approved portable Python runtime into `runtime/`.
+2. Run:
 
 ```powershell
-.\scripts\prepare_runtime.ps1 -RuntimeSource C:\ApprovedPythonRuntime
 .\scripts\build_release.ps1
 ```
 
-The build uses PyInstaller `--onedir` and produces `build/Unified-Streamlit-Launcher`.
+Shortcut:
 
-## Architecture
+```powershell
+.\scripts\build_exe.ps1
+```
 
-See [documentation/architecture.md](documentation/architecture.md).
+Output:
 
-## Adding Apps
+```text
+build/Unified-Streamlit-Launcher/
+  launcher.exe
+  config/
+  apps/
+  assets/
+  runtime/
+  docs/
+```
 
-See [documentation/adding_new_apps.md](documentation/adding_new_apps.md). Apps are registered in `apps/apps.json`; no launcher Python code needs editing.
+Users can copy that folder and double-click `launcher.exe`.
 
-## Troubleshooting
+## Add Apps After Building
 
-See [documentation/troubleshooting.md](documentation/troubleshooting.md).
+The apps are external to the executable. After a release is built, you can add or replace apps in the release folder:
 
-## Icon Licensing
+```text
+build/Unified-Streamlit-Launcher/apps/
+  apps.json
+  my_new_app/
+    app.py
+    requirements.txt
+    README.md
+    assets/icon.svg
+```
 
-Demo SVG icons are locally generated placeholders. See `assets/licenses/`.
+Then add the app to `apps/apps.json` and restart `launcher.exe`.
 
-## Production Cautions
+## Documentation
 
-Code signing, antivirus allow-list testing, checksum verification, and clean-machine validation are required before broad stakeholder deployment.
+- [Quickstart](docs/quickstart.md)
+- [Creating apps](docs/creating_apps.md)
+- [Deployment](docs/deployment.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Architecture](docs/architecture.md)
+
+## Validation
+
+```powershell
+python -m pytest
+```
+
+The framework includes tests for config loading, app registry validation, path security, environment paths, process launch commands, health checks, and updates.

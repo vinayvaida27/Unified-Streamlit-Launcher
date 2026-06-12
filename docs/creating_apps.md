@@ -1,6 +1,6 @@
 # Adding New Apps
 
-Create a folder under `apps/` containing everything that app needs:
+Copy `apps/app_template` or create a folder under `apps/` containing everything that app needs:
 
 ```text
 app.py
@@ -41,3 +41,5 @@ Example `apps/apps.json` entry:
 Most fields such as app type, Python version, wheelhouse, and launch settings come from the `defaults` section of `apps/apps.json`.
 
 Restart the launcher. No Python list and no launcher code needs editing.
+
+The same pattern works after building the `.exe`: add the app folder under `build/Unified-Streamlit-Launcher/apps/`, update `build/Unified-Streamlit-Launcher/apps/apps.json`, then restart `launcher.exe`.

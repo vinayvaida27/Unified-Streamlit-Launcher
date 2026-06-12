@@ -9,3 +9,9 @@ build/Unified-Streamlit-Launcher/
 ```
 
 Do not edit generated build files by hand. Edit source files, app folders, or `apps/apps.json`, then rebuild.
+
+Build with:
+
+```powershell
+.\scripts\build_exe.ps1
+```

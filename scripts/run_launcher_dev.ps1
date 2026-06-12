@@ -1,4 +1,4 @@
-param([string]$Config = "launcher_config.json")
+param([string]$Config = "config\launcher_config.json")
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot

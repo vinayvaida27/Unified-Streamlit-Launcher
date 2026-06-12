@@ -16,12 +16,12 @@ def repo_root() -> Path:
 
 @pytest.fixture()
 def config(repo_root: Path):
-    return load_platform_config(repo_root / "launcher_config.json")
+    return load_platform_config(repo_root / "config" / "launcher_config.json")
 
 
 @pytest.fixture()
 def temp_config(tmp_path: Path, repo_root: Path):
-    data = json.loads((repo_root / "launcher_config.json").read_text(encoding="utf-8"))
+    data = json.loads((repo_root / "config" / "launcher_config.json").read_text(encoding="utf-8"))
     data["paths"]["apps_directory"] = str(repo_root / "apps")
     data["paths"]["runtime_python"] = str(repo_root / "runtime" / "python.exe")
     data["paths"]["local_cache_directory"] = str(tmp_path / "cache")

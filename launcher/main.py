@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     """Run the desktop launcher."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="launcher_config.json")
+    parser.add_argument("--config", default="config/launcher_config.json")
     parser.add_argument("--development", action="store_true")
     args = parser.parse_args(argv)
 
