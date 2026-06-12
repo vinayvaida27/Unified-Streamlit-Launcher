@@ -5,7 +5,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 dist/
-build/release/
+build/Unified-Streamlit-Launcher/
 build/pyinstaller/
 *.spec
 logs/

@@ -1,6 +1,6 @@
 # Deployment
 
-Publish the portable release folder to a read-only network location such as `\\server\shared\UnifiedStreamlitPlatform\Published`. Application code and environments should be synchronized to `%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform` before execution.
+Publish the portable release folder from `build/Unified-Streamlit-Launcher` to a read-only network location such as `\\server\shared\UnifiedStreamlitPlatform\Published`. Application code and environments should be synchronized to `%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform` before execution.
 
 Prepare a runtime with `scripts/prepare_runtime.ps1`. Validate on a clean Windows machine without Python installed.
 

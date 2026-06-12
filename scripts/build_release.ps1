@@ -2,11 +2,11 @@ param()
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
-$Release = Join-Path $Root "build\release\UnifiedStreamlitPlatform"
+$Release = Join-Path $Root "build\Unified-Streamlit-Launcher"
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
 if (!(Test-Path $Python)) { throw "Run scripts/setup_dev.ps1 first." }
 
-Remove-Item -Recurse -Force (Join-Path $Root "build\release") -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force $Release -ErrorAction SilentlyContinue
 & $Python -m pytest
 & (Join-Path $PSScriptRoot "build_launcher.ps1")
 

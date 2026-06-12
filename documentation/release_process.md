@@ -3,7 +3,7 @@
 1. Run `scripts/setup_dev.ps1`.
 2. Prepare or validate `runtime/`.
 3. Run `scripts/build_release.ps1`.
-4. Review `checksums.sha256`.
+4. Review `build/Unified-Streamlit-Launcher/checksums.sha256`.
 5. Code sign `launcher.exe`.
 6. Copy the release to a read-only network publishing folder.
 7. Validate on a clean Windows VM.

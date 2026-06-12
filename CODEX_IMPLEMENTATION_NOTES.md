@@ -5,7 +5,7 @@ This repository was generated from `CODEX_UNIFIED_STREAMLIT_LAUNCHER_INSTRUCTION
 Implemented scope:
 
 - PySide6 launcher shell with searchable/filterable application cards.
-- Dynamic app discovery from strict JSON manifests.
+- Dynamic app discovery from the central `apps/apps.json` registry.
 - Runtime resolution with development fallback and production fail-closed behavior.
 - Per-app/per-version virtual environment management with ready markers.
 - Streamlit process management with dynamic localhost ports and health polling.

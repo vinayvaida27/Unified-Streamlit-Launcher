@@ -1,4 +1,4 @@
-"""Application manifest discovery and validation."""
+"""Application registry discovery and validation."""
 
 from __future__ import annotations
 
@@ -22,15 +22,38 @@ def _required(data: dict, key: str):
     return data[key]
 
 
+def _merge_defaults(defaults: dict, app_data: dict) -> dict:
+    data = {**defaults, **app_data}
+    launch_defaults = defaults.get("launch", {})
+    launch_data = app_data.get("launch", {})
+    data["launch"] = {**launch_defaults, **launch_data}
+    return data
+
+
+def _manifest_from_registry_entry(apps_directory: Path, defaults: dict, app_data: dict) -> ApplicationManifest:
+    """Build and validate an application manifest from apps/apps.json."""
+
+    reject_command_injection_fields(app_data)
+    data = _merge_defaults(defaults, app_data)
+    folder_raw = str(_required(data, "folder"))
+    reject_path_traversal(folder_raw)
+    app_dir = ensure_within_directory(apps_directory / folder_raw, apps_directory)
+    return _load_app_manifest_data(app_dir, data)
+
+
 def load_app_manifest(app_dir: Path) -> ApplicationManifest:
-    """Load and strictly validate an application manifest."""
+    """Load and strictly validate a legacy per-app manifest."""
 
-    manifest_path = app_dir / "app_manifest.json"
-    data = read_json(manifest_path)
+    data = read_json(app_dir / "app_manifest.json")
     reject_command_injection_fields(data)
+    return _load_app_manifest_data(app_dir, data)
 
-    if data.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
-        raise ManifestValidationError("Unsupported application manifest schema version")
+
+def _load_app_manifest_data(app_dir: Path, data: dict) -> ApplicationManifest:
+    """Validate application metadata against files inside app_dir."""
+
+    if int(data.get("schema_version", SUPPORTED_SCHEMA_VERSION)) != SUPPORTED_SCHEMA_VERSION:
+        raise ManifestValidationError("Unsupported application schema version")
     app_id = str(_required(data, "id"))
     validate_app_id(app_id)
     version = str(_required(data, "version"))
@@ -68,7 +91,7 @@ def load_app_manifest(app_dir: Path) -> ApplicationManifest:
         raise ManifestValidationError("Streamlit apps must bind to 127.0.0.1")
 
     return ApplicationManifest(
-        schema_version=data["schema_version"],
+        schema_version=int(data.get("schema_version", SUPPORTED_SCHEMA_VERSION)),
         id=app_id,
         name=str(_required(data, "name")),
         version=version,
@@ -94,12 +117,28 @@ def load_app_manifest(app_dir: Path) -> ApplicationManifest:
     )
 
 
-def discover_apps(apps_directory: Path, include_disabled: bool = False) -> list[ApplicationManifest]:
-    """Discover valid application manifests."""
+def _discover_from_registry(apps_directory: Path, include_disabled: bool) -> list[ApplicationManifest]:
+    registry_path = apps_directory / "apps.json"
+    registry = read_json(registry_path)
+    if registry.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
+        raise ManifestValidationError("Unsupported app registry schema version")
+    defaults = registry.get("defaults", {})
+    discovered: list[ApplicationManifest] = []
+    seen_ids: set[str] = set()
+    for app_data in registry.get("applications", []):
+        try:
+            app = _manifest_from_registry_entry(apps_directory, defaults, app_data)
+            if app.id in seen_ids:
+                raise ManifestValidationError(f"Duplicate application ID: {app.id}")
+            seen_ids.add(app.id)
+            if app.enabled or include_disabled:
+                discovered.append(app)
+        except (ManifestValidationError, SecurityValidationError, ValueError) as exc:
+            LOG.exception("Skipping invalid application registry entry in %s: %s", registry_path, exc)
+    return discovered
 
-    if not apps_directory.exists():
-        LOG.warning("Applications directory does not exist: %s", apps_directory)
-        return []
+
+def _discover_from_legacy_manifests(apps_directory: Path, include_disabled: bool) -> list[ApplicationManifest]:
     discovered: list[ApplicationManifest] = []
     seen_ids: set[str] = set()
     for manifest_path in sorted(apps_directory.glob("*/app_manifest.json")):
@@ -112,4 +151,17 @@ def discover_apps(apps_directory: Path, include_disabled: bool = False) -> list[
                 discovered.append(app)
         except (ManifestValidationError, SecurityValidationError, ValueError) as exc:
             LOG.exception("Skipping invalid application manifest at %s: %s", manifest_path, exc)
+    return discovered
+
+
+def discover_apps(apps_directory: Path, include_disabled: bool = False) -> list[ApplicationManifest]:
+    """Discover valid apps from apps/apps.json, with legacy manifest fallback."""
+
+    if not apps_directory.exists():
+        LOG.warning("Applications directory does not exist: %s", apps_directory)
+        return []
+    if (apps_directory / "apps.json").exists():
+        discovered = _discover_from_registry(apps_directory, include_disabled)
+    else:
+        discovered = _discover_from_legacy_manifests(apps_directory, include_disabled)
     return sorted(discovered, key=lambda app: (app.display_order, app.name.lower()))

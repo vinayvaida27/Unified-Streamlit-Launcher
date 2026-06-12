@@ -4,7 +4,30 @@ Production-oriented Windows desktop launcher for multiple Python/Streamlit appli
 
 ![Screenshot placeholder](assets/launcher/launcher.png)
 
-The launcher is a PySide6 desktop wrapper and process manager. It discovers app manifests under `apps/`, prepares isolated virtual environments in a per-user local cache, starts Streamlit on dynamic `127.0.0.1` ports, waits for health, then opens the default browser.
+The launcher is a PySide6 desktop wrapper and process manager. It reads one simple registry file, `apps/apps.json`, prepares isolated virtual environments in a per-user local cache, starts Streamlit on dynamic `127.0.0.1` ports, waits for readiness, then opens the default browser.
+
+## Simple Project Layout
+
+```text
+Unified-Streamlit-Launcher/
+  apps/
+    apps.json                  # one place to register apps
+    01_hello_pipeline/         # one self-contained Streamlit app
+      app.py
+      requirements.txt
+      README.md
+      assets/icon.svg
+  launcher/                    # desktop launcher framework
+  build/                       # generated builds/releases go here
+  scripts/
+  documentation/
+```
+
+New people only need to understand:
+
+- Put Streamlit apps in `apps/<app_folder>/`.
+- Register each app in `apps/apps.json`.
+- Run the launcher in development mode or build a release into `build/`.
 
 ## Development Setup
 
@@ -22,7 +45,7 @@ Development mode may fall back to the current Python interpreter when `runtime/p
 .\scripts\build_release.ps1
 ```
 
-The build uses PyInstaller `--onedir` and produces `build/release/UnifiedStreamlitPlatform`.
+The build uses PyInstaller `--onedir` and produces `build/Unified-Streamlit-Launcher`.
 
 ## Architecture
 
@@ -30,7 +53,7 @@ See [documentation/architecture.md](documentation/architecture.md).
 
 ## Adding Apps
 
-See [documentation/adding_new_apps.md](documentation/adding_new_apps.md). Apps are discovered dynamically; no Python app list needs editing.
+See [documentation/adding_new_apps.md](documentation/adding_new_apps.md). Apps are registered in `apps/apps.json`; no launcher Python code needs editing.
 
 ## Troubleshooting
 

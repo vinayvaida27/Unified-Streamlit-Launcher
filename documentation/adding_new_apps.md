@@ -1,42 +1,43 @@
 # Adding New Apps
 
-Create a folder under `apps/` containing:
+Create a folder under `apps/` containing everything that app needs:
 
 ```text
 app.py
-app_manifest.json
 requirements.txt
 README.md
 assets/icon.svg
 ```
 
-Example manifest:
+Then register it in `apps/apps.json`.
+
+Example folder:
+
+```text
+apps/11_ab1file_process/
+  app.py
+  requirements.txt
+  README.md
+  assets/icon.svg
+```
+
+Example `apps/apps.json` entry:
 
 ```json
 {
-  "schema_version": 1,
-  "id": "eleventh-app",
-  "name": "Eleventh App",
+  "id": "ab1file-process",
+  "folder": "11_ab1file_process",
+  "name": "AB1 File Process",
   "version": "1.0.0",
-  "description": "A new Streamlit application.",
-  "category": "Demonstration",
-  "type": "streamlit",
+  "description": "Process AB1 files with a Streamlit interface.",
+  "category": "Bioinformatics",
+  "display_order": 11,
   "entrypoint": "app.py",
   "icon": "assets/icon.svg",
-  "requirements": "requirements.txt",
-  "wheelhouse": "wheelhouse",
-  "python_version": "3.11",
-  "enabled": true,
-  "display_order": 11,
-  "launch": {
-    "address": "127.0.0.1",
-    "port": "dynamic",
-    "headless": true,
-    "file_watcher_type": "none",
-    "gather_usage_stats": false,
-    "startup_timeout_seconds": 60
-  }
+  "requirements": "requirements.txt"
 }
 ```
 
-Restart the launcher or add a future refresh action. No Python list needs editing.
+Most fields such as app type, Python version, wheelhouse, and launch settings come from the `defaults` section of `apps/apps.json`.
+
+Restart the launcher. No Python list and no launcher code needs editing.
