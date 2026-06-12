@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
+import stat
+import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,12 +64,10 @@ class LocalCacheManager:
         if not self._cache_marker_matches(marker_path, fingerprint):
             cached_runtime_dir.parent.mkdir(parents=True, exist_ok=True)
             temp_dir = cached_runtime_dir.parent / ".current.staging"
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
-            if cached_runtime_dir.exists():
-                shutil.rmtree(cached_runtime_dir)
+            self._force_rmtree(temp_dir)
+            self._force_rmtree(cached_runtime_dir)
             shutil.copytree(source_runtime_dir, temp_dir, ignore=self._copy_ignore)
-            temp_dir.replace(cached_runtime_dir)
+            self._safe_replace(temp_dir, cached_runtime_dir)
             atomic_write_json(
                 marker_path,
                 {
@@ -96,12 +97,10 @@ class LocalCacheManager:
         if not self._cache_marker_matches(marker_path, source_fingerprint):
             cached_app_dir.parent.mkdir(parents=True, exist_ok=True)
             temp_dir = cached_app_dir.parent / f".{cached_app_dir.name}.staging"
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
-            if cached_app_dir.exists():
-                shutil.rmtree(cached_app_dir)
+            self._force_rmtree(temp_dir)
+            self._force_rmtree(cached_app_dir)
             shutil.copytree(app.app_dir, temp_dir, ignore=self._copy_ignore)
-            temp_dir.replace(cached_app_dir)
+            self._safe_replace(temp_dir, cached_app_dir)
             atomic_write_json(
                 marker_path,
                 {
@@ -136,6 +135,51 @@ class LocalCacheManager:
         if last_exit_code is not None:
             entry["last_exit_code"] = last_exit_code
         atomic_write_json(self.state_path, state)
+
+    @staticmethod
+    def _force_rmtree(path: Path, attempts: int = 5) -> None:
+        """Delete a directory tree on Windows even with read-only or briefly-locked files.
+
+        CPython runtime files (e.g. from the NuGet package) are often read-only,
+        which makes a plain shutil.rmtree fail with "directory not empty"; and
+        antivirus/indexer handles can lock files transiently. This clears the
+        read-only bit on error and retries with a short backoff.
+        """
+
+        if not path.exists():
+            return
+
+        def _on_error(func, target, _exc_info):
+            try:
+                os.chmod(target, stat.S_IWRITE)
+                func(target)
+            except OSError:
+                pass
+
+        for attempt in range(attempts):
+            try:
+                shutil.rmtree(path, onerror=_on_error)
+            except OSError:
+                pass
+            if not path.exists():
+                return
+            time.sleep(0.3 * (attempt + 1))
+        # Last try; let any final error surface with a clear message.
+        if path.exists():
+            shutil.rmtree(path, onerror=_on_error)
+
+    @staticmethod
+    def _safe_replace(source: Path, destination: Path, attempts: int = 5) -> None:
+        """Atomically move a staged directory into place, retrying past transient locks."""
+
+        for attempt in range(attempts):
+            try:
+                os.replace(source, destination)
+                return
+            except OSError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(0.3 * (attempt + 1))
 
     @staticmethod
     def _copy_ignore(directory: str, names: list[str]) -> set[str]:

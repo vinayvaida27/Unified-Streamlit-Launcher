@@ -84,3 +84,43 @@ def test_runtime_resolver_can_skip_validation_before_local_sync(temp_config, tmp
     monkeypatch.setattr(resolver, "validate", fail_validate)
 
     assert resolver.resolve(validate=False) == runtime_python
+
+
+def test_ensure_environment_runs_full_flow(temp_config, repo_root, monkeypatch):
+    """Drive ensure_environment end-to-end with mocks.
+
+    Guards against truncated/incomplete method bodies: a fresh environment must
+    create the venv, install deps, validate, and write a complete marker without
+    raising NameError or leaving steps out.
+    """
+
+    app = discover_apps(repo_root / "apps")[0]
+    manager = EnvironmentManager(temp_config, repo_root / "fake-python.exe")
+
+    calls = []
+
+    def fake_run_logged(command, log_handle, timeout_seconds, failure_message, error_cls):
+        calls.append(command[1] if len(command) > 1 else command[0])
+
+    monkeypatch.setattr(manager, "_run_logged", fake_run_logged)
+    # Pretend the venv python exists after creation so the marker write can proceed.
+    monkeypatch.setattr(manager, "venv_python_for", lambda env_path: env_path / "python")
+    monkeypatch.setattr(
+        "launcher.environment_manager.subprocess.check_output",
+        lambda *a, **k: "Python 3.11.9",
+    )
+
+    progress_messages = []
+    state = manager.ensure_environment(app, progress=progress_messages.append)
+
+    assert state.ready is True
+    assert state.app_id == app.id
+    # venv creation + pip install + streamlit validation all ran.
+    assert calls == ["-m", "-m", "-c"]
+    assert "Creating virtual environment" in progress_messages
+    assert "Installing dependencies" in progress_messages
+    # A complete marker was written.
+    marker = json.loads(state.marker_path.read_text(encoding="utf-8"))
+    assert marker["app_id"] == app.id
+    assert marker["runtime_fingerprint"] == manager.runtime_fingerprint()
+    assert "installed_at" in marker

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -52,8 +53,6 @@ class RuntimeResolver:
 
 def scrubbed_environment() -> dict[str, str]:
     """Return a child-process environment without system-Python contamination."""
-
-    import os
 
     env = os.environ.copy()
     for variable in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONUSERBASE"):
@@ -157,4 +156,52 @@ class EnvironmentManager:
 
         env_path = self.environment_path_for(app)
         venv_python = self.venv_python_for(env_path)
-        marker_pat
+        marker_path = self.marker_path_for(env_path)
+        if progress:
+            progress("Checking environment")
+        if self.is_ready(app):
+            return EnvironmentState(app.id, app.version, env_path, venv_python, True, marker_path)
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        log_path = self.logs_dir / f"{app.id}.log"
+        with log_path.open("w", encoding="utf-8") as log_handle:
+            log_handle.write(f"{datetime.now(timezone.utc).isoformat()} Preparing environment for {app.name} {app.version}\n")
+            if progress:
+                progress("Creating virtual environment")
+            self._run_logged(
+                [str(self.runtime_python), "-m", "venv", str(env_path)],
+                log_handle,
+                self.VENV_TIMEOUT_SECONDS,
+                "Virtual environment creation failed",
+                EnvironmentCreationError,
+            )
+            if progress:
+                progress("Installing dependencies")
+            self._run_logged(
+                self.pip_install_command(app, venv_python),
+                log_handle,
+                self.PIP_TIMEOUT_SECONDS,
+                "Dependency installation failed",
+                DependencyInstallationError,
+            )
+            if progress:
+                progress("Validating environment")
+            self._run_logged(
+                [str(venv_python), "-c", "import streamlit"],
+                log_handle,
+                self.VENV_TIMEOUT_SECONDS,
+                "Streamlit validation import failed",
+                DependencyInstallationError,
+            )
+        atomic_write_json(
+            marker_path,
+            {
+                "app_id": app.id,
+                "app_version": app.version,
+                "python_version": subprocess.check_output([str(venv_python), "--version"], text=True, env=scrubbed_environment()).strip(),
+                "requirements_sha256": self.requirements_hash(app.requirements),
+                "runtime_fingerprint": self.runtime_fingerprint(),
+                "installed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        return EnvironmentState(app.id, app.version, env_path, venv_python, True, marker_path)

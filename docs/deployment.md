@@ -61,20 +61,35 @@ build/Unified-Streamlit-Launcher/
 
 ## Step 3 - Distribute
 
-Pick one:
+**Recommended: one-click installer (single Setup.exe).** This is the simplest
+thing to hand a non-technical user -- one file, double-click, done. Install
+NSIS once (`winget install NSIS.NSIS`), then:
 
-**A. Copy the folder.** Give users the whole
-`build/Unified-Streamlit-Launcher/` folder (USB, zip, or network share). They
-double-click `launcher.exe`.
+```powershell
+.\scripts\build_installer.ps1
+```
 
-**B. Network share.** Put the folder on `\\server\share\...`, make it
-read-only for users. Many users run the same `launcher.exe`; each gets a
-private local cache, runtime copy, and venvs under
+This builds the release, verifies a bundled runtime is present, and compiles
+`build\UnifiedStreamlitLauncherSetup.exe`. The installer:
+
+- installs per-user into `%LOCALAPPDATA%\UnifiedStreamlitLauncher` (no admin
+  prompt),
+- creates Start Menu and Desktop shortcuts,
+- registers an uninstaller in Add/Remove Programs,
+- offers to launch the app on finish.
+
+Users just double-click `UnifiedStreamlitLauncherSetup.exe`. Code-signing the
+Setup.exe is recommended before wide distribution.
+
+Other options:
+
+**Copy the folder.** Give users the whole `build/Unified-Streamlit-Launcher/`
+folder (USB, zip, or network share). They double-click `launcher.exe`.
+
+**Network share.** Put the folder on `\\server\share\...`, read-only for
+users. Many users run the same `launcher.exe`; each gets a private local cache,
+runtime copy, and venvs under
 `%LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform\`.
-
-**C. One-click installer.** Build the NSIS installer
-(`build_scripts/installer.nsis`) for a single Setup.exe. Code-signing is
-recommended before wide distribution.
 
 ## Alternative - no bundled runtime (auto-download)
 
