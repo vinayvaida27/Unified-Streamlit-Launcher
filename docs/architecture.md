@@ -1,5 +1,7 @@
 # Architecture
 
+## High-Level Runtime
+
 ```mermaid
 flowchart LR
     User["User"] --> GUI["PySide6 Launcher"]
@@ -12,14 +14,41 @@ flowchart LR
     Streamlit --> Browser["Default Browser"]
 ```
 
+## Network Drive, Many Users
+
+```mermaid
+flowchart LR
+    Share["Network Share<br/>Unified-Streamlit-Launcher<br/>launcher.exe, apps, config, runtime"]
+    U1["User 1 PC"]
+    U2["User 2 PC"]
+    U15["User 15 PC"]
+    C1["User 1 Local Cache<br/>runtime, apps, venvs, logs"]
+    C2["User 2 Local Cache<br/>runtime, apps, venvs, logs"]
+    C15["User 15 Local Cache<br/>runtime, apps, venvs, logs"]
+    B1["Browser localhost"]
+    B2["Browser localhost"]
+    B15["Browser localhost"]
+
+    Share --> U1 --> C1 --> B1
+    Share --> U2 --> C2 --> B2
+    Share --> U15 --> C15 --> B15
+```
+
+The network share is the read-only distribution source. Each user machine receives its own local copy of the portable runtime, app source folders, virtual environments, logs, and state under `%LOCALAPPDATA%`.
+
+## Launch Sequence
+
 ```mermaid
 sequenceDiagram
     actor User
     participant GUI as Launcher GUI
+    participant Cache as Local Cache
     participant EM as Environment Manager
     participant PM as Process Manager
     participant ST as Streamlit
     participant Browser
+    User->>GUI: Double-click launcher.exe on network share
+    GUI->>Cache: Sync runtime and app folders locally
     User->>GUI: Click Open
     GUI->>EM: Ensure app environment
     EM-->>GUI: Environment ready

@@ -21,16 +21,18 @@ class RuntimeResolver:
         self.config = config
         self.development_mode = development_mode
 
-    def resolve(self) -> Path:
+    def resolve(self, validate: bool = True) -> Path:
         """Resolve the runtime path according to production/development rules."""
 
         runtime_python = self.config.paths.runtime_python
         if runtime_python.exists():
-            self.validate(runtime_python)
+            if validate:
+                self.validate(runtime_python)
             return runtime_python
         if self.development_mode and self.config.runtime.allow_development_interpreter_fallback:
             fallback = Path(sys.executable)
-            self.validate(fallback)
+            if validate:
+                self.validate(fallback)
             return fallback
         raise RuntimeNotFoundError(f"Bundled runtime is missing: {runtime_python}")
 

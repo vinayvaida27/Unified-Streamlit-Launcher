@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from launcher.app_discovery import discover_apps
-from launcher.environment_manager import EnvironmentManager
+from launcher.environment_manager import EnvironmentManager, RuntimeResolver
 
 
 def test_calculates_deterministic_environment_path(temp_config, repo_root):
@@ -56,3 +56,18 @@ def test_chooses_offline_wheelhouse_when_available(temp_config, copied_apps):
     command = manager.pip_install_command(app, copied_apps / "venv-python.exe")
     assert "--no-index" in command
     assert "--find-links" in command
+
+
+def test_runtime_resolver_can_skip_validation_before_local_sync(temp_config, tmp_path, monkeypatch):
+    runtime_python = tmp_path / "network_runtime" / "python.exe"
+    runtime_python.parent.mkdir()
+    runtime_python.write_text("placeholder", encoding="utf-8")
+    object.__setattr__(temp_config.paths, "runtime_python", runtime_python)
+
+    def fail_validate(_python_path):
+        raise AssertionError("network runtime should not be executed before local sync")
+
+    resolver = RuntimeResolver(temp_config, development_mode=False)
+    monkeypatch.setattr(resolver, "validate", fail_validate)
+
+    assert resolver.resolve(validate=False) == runtime_python

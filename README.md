@@ -65,7 +65,7 @@ build/Unified-Streamlit-Launcher/
 
 Users can copy that folder and double-click `launcher.exe`.
 
-The same folder can be published on a network drive. On startup, registered app folders are copied into each user's local cache before Streamlit starts, so apps are centrally distributed but locally executed.
+The same folder can be published on a network drive. On startup, the bundled runtime and registered app folders are copied into each user's local cache before Streamlit starts, so apps are centrally distributed but locally executed.
 
 ## Add Apps After Building
 

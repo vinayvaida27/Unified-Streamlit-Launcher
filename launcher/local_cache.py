@@ -20,6 +20,7 @@ class LocalCacheManager:
         self.base_dir = base_dir
         self.environments_dir = base_dir / "environments"
         self.apps_dir = base_dir / "apps"
+        self.runtime_dir = base_dir / "runtime"
         self.logs_dir = base_dir / "logs"
         self.state_dir = base_dir / "state"
         self.staging_dir = base_dir / "staging"
@@ -27,8 +28,55 @@ class LocalCacheManager:
     def ensure_directories(self) -> None:
         """Create expected local cache directories."""
 
-        for path in (self.base_dir, self.apps_dir, self.environments_dir, self.logs_dir, self.state_dir, self.staging_dir):
+        for path in (
+            self.base_dir,
+            self.apps_dir,
+            self.runtime_dir,
+            self.environments_dir,
+            self.logs_dir,
+            self.state_dir,
+            self.staging_dir,
+        ):
             path.mkdir(parents=True, exist_ok=True)
+
+    def sync_runtime_to_local_cache(self, runtime_python: Path) -> Path:
+        """Copy the bundled runtime into the per-user local cache.
+
+        Network shares are a good distribution point, but the Python runtime
+        should execute from local disk. This returns the cached python.exe path.
+        """
+
+        runtime_python = runtime_python.resolve()
+        source_runtime_dir = runtime_python.parent
+        try:
+            runtime_python.relative_to(self.runtime_dir.resolve())
+            return runtime_python
+        except ValueError:
+            pass
+
+        fingerprint = self._fingerprint_directory_metadata(source_runtime_dir)
+        cached_runtime_dir = self.runtime_dir / "current"
+        cached_python = cached_runtime_dir / runtime_python.name
+        marker_path = cached_runtime_dir / ".runtime_cache_ready.json"
+        if not self._cache_marker_matches(marker_path, fingerprint):
+            cached_runtime_dir.parent.mkdir(parents=True, exist_ok=True)
+            temp_dir = cached_runtime_dir.parent / ".current.staging"
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+            if cached_runtime_dir.exists():
+                shutil.rmtree(cached_runtime_dir)
+            shutil.copytree(source_runtime_dir, temp_dir, ignore=self._copy_ignore)
+            temp_dir.replace(cached_runtime_dir)
+            atomic_write_json(
+                marker_path,
+                {
+                    "source_path": str(source_runtime_dir),
+                    "source_fingerprint": fingerprint,
+                    "cached_python": str(cached_python),
+                    "cached_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        return cached_python.resolve()
 
     def sync_apps_to_local_cache(self, apps: list[ApplicationManifest]) -> list[ApplicationManifest]:
         """Copy app source folders into the per-user local cache.
@@ -115,6 +163,21 @@ class LocalCacheManager:
             relative = path.relative_to(directory).as_posix()
             digest.update(relative.encode("utf-8"))
             digest.update(path.read_bytes())
+        return digest.hexdigest()
+
+    @staticmethod
+    def _fingerprint_directory_metadata(directory: Path) -> str:
+        digest = hashlib.sha256()
+        for path in sorted(directory.rglob("*")):
+            if not path.is_file() or path.name.endswith(".log"):
+                continue
+            if any(part in {"__pycache__", ".pytest_cache", ".mypy_cache"} for part in path.parts):
+                continue
+            stat = path.stat()
+            relative = path.relative_to(directory).as_posix()
+            digest.update(relative.encode("utf-8"))
+            digest.update(str(stat.st_size).encode("ascii"))
+            digest.update(str(stat.st_mtime_ns).encode("ascii"))
         return digest.hexdigest()
 
     @staticmethod

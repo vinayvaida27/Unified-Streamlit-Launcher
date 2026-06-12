@@ -30,7 +30,11 @@ def main(argv: list[str] | None = None) -> int:
     cache.ensure_directories()
     configure_logging(config.paths.local_cache_directory, config.logging)
     apps = cache.sync_apps_to_local_cache(discover_apps(config.paths.apps_directory))
-    runtime_python = RuntimeResolver(config, development_mode=args.development).resolve()
+    runtime_resolver = RuntimeResolver(config, development_mode=args.development)
+    runtime_python = runtime_resolver.resolve(validate=args.development)
+    if not args.development:
+        runtime_python = cache.sync_runtime_to_local_cache(runtime_python)
+        runtime_resolver.validate(runtime_python)
     env_manager = EnvironmentManager(config, runtime_python)
     process_manager = ProcessManager(cache.logs_dir)
 

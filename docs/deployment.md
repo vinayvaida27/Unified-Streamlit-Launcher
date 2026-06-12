@@ -30,9 +30,10 @@ Users who have access to the share can double-click `launcher.exe`.
 On startup, the launcher:
 
 1. reads `apps/apps.json` from the release folder;
-2. copies each registered app folder into the user's local cache;
-3. creates or reuses per-app virtual environments under the local cache;
-4. runs Streamlit from local cached app source, not directly from the network app folder.
+2. copies the bundled `runtime/` folder into the user's local cache;
+3. copies each registered app folder into the user's local cache;
+4. creates or reuses per-app virtual environments under the local cache;
+5. runs Streamlit from local cached runtime and app source, not directly from the network app folder.
 
 Default local cache:
 
@@ -40,7 +41,7 @@ Default local cache:
 %LOCALAPPDATA%\OrganizationName\UnifiedStreamlitPlatform
 ```
 
-This keeps the shared network folder as the distribution source while avoiding slow or fragile Python execution from the network drive.
+This keeps the shared network folder as the distribution source while avoiding slow or fragile Python execution from the network drive. Fifteen users can open the same shared `launcher.exe`; each user gets separate local runtime, app, environment, log, and state folders.
 
 ## Distribution Options
 
