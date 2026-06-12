@@ -28,6 +28,8 @@ Run:
 build/Unified-Streamlit-Launcher/launcher.exe
 ```
 
+For detailed build notes, see [BUILD.md](BUILD.md).
+
 ## Add A New App
 
 1. Copy `apps/app_template` to a new folder.

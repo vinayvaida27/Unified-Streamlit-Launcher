@@ -1,41 +1,36 @@
 # Troubleshooting
 
-## Runtime Missing
+## App does not open
 
-Production requires `runtime/python.exe`. Run `scripts/prepare_runtime.ps1` with an approved runtime.
+Use **View Log** on the app card. If Streamlit wrote a ready URL, the launcher should mark the app running and enable **Open**.
 
-## Environment Creation Failed
+## First launch is slow
 
-Open the launcher log and app log under the local cache. Check write permissions and venv support.
+The launcher is creating a per-app virtual environment and installing dependencies. Later launches reuse the environment.
 
-## Pip Installation Failed
+## Runtime missing
 
-Use a populated app `wheelhouse` for offline installs or enable network access for development dependency installation.
+Production releases require `runtime/python.exe`.
 
-## Network Share Unavailable
+Use:
 
-The launcher should continue using the last valid local version when update checks cannot reach the network share.
+```powershell
+.\scripts\prepare_runtime.ps1 -RuntimeSource C:\ApprovedPythonRuntime
+```
 
-## Port Conflict
+## Need to add an app after build
 
-Ports are dynamic. Restart the app if a selected port becomes unavailable before launch.
+Edit the built release folder:
 
-## Startup Timeout
+```text
+build/Unified-Streamlit-Launcher/apps/
+```
 
-Open the app log. Streamlit may have crashed during import or dependency loading.
+Add the app folder and update `apps.json`, then restart `launcher.exe`.
 
-## Browser Did Not Open
+## Rebuild everything
 
-Use Open again on the running card. The launcher stores the app URL after health succeeds.
-
-## Streamlit Process Crashed
-
-View the app log. The process manager marks crashed apps failed and clears stale state.
-
-## Icon Missing
-
-Invalid manifests with missing icons are skipped and logged. Add `assets/icon.svg`.
-
-## Network Share Unavailable
-
-Confirm the UNC path and user read permissions.
+```powershell
+.\scripts\clean.ps1
+.\scripts\build_exe.ps1
+```

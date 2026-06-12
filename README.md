@@ -48,12 +48,6 @@ Development requires Python 3.11 or 3.12. The dev launcher can use the local int
 2. Run:
 
 ```powershell
-.\scripts\build_release.ps1
-```
-
-Shortcut:
-
-```powershell
 .\scripts\build_exe.ps1
 ```
 
@@ -90,8 +84,11 @@ Then add the app to `apps/apps.json` and restart `launcher.exe`.
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)
+- [Build EXE](docs/BUILD.md)
 - [Creating apps](docs/creating_apps.md)
+- [App development](docs/APP_DEVELOPMENT.md)
 - [Deployment](docs/deployment.md)
+- [Release process](docs/release_process.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture](docs/architecture.md)
 

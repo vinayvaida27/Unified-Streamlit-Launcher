@@ -1,0 +1,12 @@
+; Optional NSIS installer stub.
+; The default deployment is portable: copy build\Unified-Streamlit-Launcher.
+
+Name "Unified Streamlit Launcher"
+OutFile "UnifiedStreamlitLauncherSetup.exe"
+InstallDir "$LOCALAPPDATA\UnifiedStreamlitLauncher"
+
+Section
+  SetOutPath "$INSTDIR"
+  File /r "..\build\Unified-Streamlit-Launcher\*"
+  CreateShortCut "$DESKTOP\Unified Streamlit Launcher.lnk" "$INSTDIR\launcher.exe"
+SectionEnd

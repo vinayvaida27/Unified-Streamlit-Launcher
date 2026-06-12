@@ -2,9 +2,11 @@ param()
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
+$Python = Join-Path $Root ".venv\Scripts\python.exe"
+if (!(Test-Path $Python)) { throw "Run scripts/setup_dev.ps1 first." }
 
 Write-Host "Building Unified Streamlit Launcher EXE release..."
-& (Join-Path $Root "scripts\build_release.ps1")
+& $Python (Join-Path $Root "build_scripts\build.py")
 
 Write-Host ""
 Write-Host "Done. Release folder:"
